@@ -148,19 +148,21 @@ static void codegen_lambda_expr(ParserContext *ctx, ASTNode *node, FILE *out)
 {
     if (node->lambda.num_captures > 0)
     {
+        int lid = node->lambda.lambda_id;
         if (g_config.use_cpp)
         {
-            fprintf(out,
-                    "({ struct Lambda_%d_Ctx *ctx = (struct Lambda_%d_Ctx*)malloc(sizeof(struct "
-                    "Lambda_%d_Ctx));\n",
-                    node->lambda.lambda_id, node->lambda.lambda_id, node->lambda.lambda_id);
+            fprintf(
+                out,
+                "({ struct Lambda_%d_Ctx *_z_ctx_%d = (struct Lambda_%d_Ctx*)malloc(sizeof(struct "
+                "Lambda_%d_Ctx));\n",
+                lid, lid, lid, lid);
         }
         else
         {
             fprintf(out,
-                    "({ struct Lambda_%d_Ctx *ctx = malloc(sizeof(struct "
+                    "({ struct Lambda_%d_Ctx *_z_ctx_%d = malloc(sizeof(struct "
                     "Lambda_%d_Ctx));\n",
-                    node->lambda.lambda_id, node->lambda.lambda_id);
+                    lid, lid, lid);
         }
         for (int i = 0; i < node->lambda.num_captures; i++)
         {
@@ -177,12 +179,14 @@ static void codegen_lambda_expr(ParserContext *ctx, ASTNode *node, FILE *out)
                             if (g_current_lambda->lambda.capture_modes &&
                                 g_current_lambda->lambda.capture_modes[k] == 1)
                             {
-                                fprintf(out, "ctx->%s = ctx->%s;\n", node->lambda.captured_vars[i],
+                                fprintf(out, "_z_ctx_%d->%s = ctx->%s;\n", lid,
+                                        node->lambda.captured_vars[i],
                                         node->lambda.captured_vars[i]);
                             }
                             else
                             {
-                                fprintf(out, "ctx->%s = &ctx->%s;\n", node->lambda.captured_vars[i],
+                                fprintf(out, "_z_ctx_%d->%s = &ctx->%s;\n", lid,
+                                        node->lambda.captured_vars[i],
                                         node->lambda.captured_vars[i]);
                             }
                             found = 1;
@@ -192,13 +196,13 @@ static void codegen_lambda_expr(ParserContext *ctx, ASTNode *node, FILE *out)
                 }
                 if (!found)
                 {
-                    fprintf(out, "ctx->%s = &%s;\n", node->lambda.captured_vars[i],
+                    fprintf(out, "_z_ctx_%d->%s = &%s;\n", lid, node->lambda.captured_vars[i],
                             node->lambda.captured_vars[i]);
                 }
             }
             else
             {
-                fprintf(out, "ctx->%s = ", node->lambda.captured_vars[i]);
+                fprintf(out, "_z_ctx_%d->%s = ", lid, node->lambda.captured_vars[i]);
 
                 ASTNode *var_node = ast_create(NODE_EXPR_VAR);
                 var_node->var_ref.name = xstrdup(node->lambda.captured_vars[i]);
@@ -223,13 +227,19 @@ static void codegen_lambda_expr(ParserContext *ctx, ASTNode *node, FILE *out)
         }
         if (g_config.use_cpp)
         {
-            fprintf(out, "z_closure_T _cl = {(void*)_lambda_%d, ctx}; _cl; })",
-                    node->lambda.lambda_id);
+            fprintf(out, "_z_closure_ctx_stash[%d] = _z_ctx_%d;\n", lid, lid);
+            fprintf(out, "z_closure_T _cl = {(void*)_lambda_%d, _z_ctx_%d}; _cl; })", lid, lid);
         }
         else
         {
-            fprintf(out, "(z_closure_T){.func = _lambda_%d, .ctx = ctx}; })",
-                    node->lambda.lambda_id);
+            fprintf(out, "_z_closure_ctx_stash[%d] = _z_ctx_%d;\n", lid, lid);
+            fprintf(out, "(z_closure_T){.func = _lambda_%d, .ctx = _z_ctx_%d}; })", lid, lid);
+        }
+
+        // Register for pending free at statement level
+        if (pending_closure_free_count < MAX_PENDING_CLOSURE_FREES)
+        {
+            pending_closure_frees[pending_closure_free_count++] = lid;
         }
     }
     else

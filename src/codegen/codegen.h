@@ -100,4 +100,10 @@ extern int loop_defer_boundary[]; ///< Defer stack index at start of each loop.
 extern int loop_depth;            ///< Current loop nesting depth.
 extern int func_defer_boundary;   ///< Defer stack index at function entry.
 
+// Closure context free tracking
+#define MAX_PENDING_CLOSURE_FREES 64
+extern int pending_closure_frees[]; ///< Lambda IDs whose ctx needs freeing.
+extern int pending_closure_free_count;
+void emit_pending_closure_frees(FILE *out);
+
 #endif

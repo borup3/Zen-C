@@ -34,6 +34,7 @@ static void emit_freestanding_preamble(FILE *out)
           out);
     fputs("#define _z_arg(x) _Generic((x), _Bool: _z_bool_str(x), default: (x))\n", out);
     fputs("typedef struct { void *func; void *ctx; } z_closure_T;\n", out);
+    fputs("static void *_z_closure_ctx_stash[256];\n", out);
 
     // In true freestanding, explicit definitions of z_malloc/etc are removed.
     // The user must implement them if they use features requiring them.
@@ -112,6 +113,7 @@ void emit_preamble(ParserContext *ctx, FILE *out)
             fputs("typedef struct { pthread_t thread; void *result; } Async;\n", out);
         }
         fputs("typedef struct { void *func; void *ctx; } z_closure_T;\n", out);
+        fputs("static void *_z_closure_ctx_stash[256];\n", out);
         fputs("typedef void U0;\ntypedef int8_t I8;\ntypedef uint8_t U8;\ntypedef "
               "int16_t I16;\ntypedef uint16_t U16;\n",
               out);

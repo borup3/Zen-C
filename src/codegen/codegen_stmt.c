@@ -962,6 +962,11 @@ void codegen_node_single(ParserContext *ctx, ASTNode *node, FILE *out)
         break;
     }
     case NODE_VAR_DECL:
+    {
+        // Save pending closure free count — if the init expr creates a closure,
+        // the variable takes ownership and we should NOT free the context.
+        int saved_closure_frees = pending_closure_free_count;
+
         if (strcmp(node->var_decl.name, "_") == 0 && node->var_decl.init_expr)
         {
             int is_void = 0;
@@ -1163,7 +1168,11 @@ void codegen_node_single(ParserContext *ctx, ASTNode *node, FILE *out)
                 }
             }
         }
+
+        // Suppress pending frees - variable owns the closure context
+        pending_closure_free_count = saved_closure_frees;
         break;
+    }
     case NODE_CONST:
         fprintf(out, "    const ");
         if (node->var_decl.type_str)
@@ -1594,6 +1603,8 @@ void codegen_node_single(ParserContext *ctx, ASTNode *node, FILE *out)
     }
     case NODE_RETURN:
     {
+        // Suppress pending closure frees — returned closures escape the scope
+        pending_closure_free_count = 0;
         int has_defers = (defer_count > func_defer_boundary);
         int handled = 0;
 
@@ -1922,6 +1933,7 @@ void codegen_node_single(ParserContext *ctx, ASTNode *node, FILE *out)
     default:
         codegen_expression(ctx, node, out);
         fprintf(out, ";\n");
+        emit_pending_closure_frees(out);
         break;
     }
 }

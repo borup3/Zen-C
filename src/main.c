@@ -624,7 +624,17 @@ int main(int argc, char **argv)
 
         if (strlen(base) > 0)
         {
-            g_config.output_file = base;
+            if (g_config.mode_transpile)
+            {
+                char *with_ext = xmalloc(strlen(base) + strlen(ext) + 1);
+                sprintf(with_ext, "%s%s", base, ext);
+                g_config.output_file = with_ext;
+                free(base);
+            }
+            else
+            {
+                g_config.output_file = base;
+            }
         }
         else
         {

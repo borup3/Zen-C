@@ -20,6 +20,19 @@ int loop_defer_boundary[MAX_LOOP_DEPTH];
 int loop_depth = 0;
 int func_defer_boundary = 0;
 
+int pending_closure_frees[MAX_PENDING_CLOSURE_FREES];
+int pending_closure_free_count = 0;
+
+void emit_pending_closure_frees(FILE *out)
+{
+    for (int i = 0; i < pending_closure_free_count; i++)
+    {
+        fprintf(out, "free(_z_closure_ctx_stash[%d]); _z_closure_ctx_stash[%d] = NULL;\n",
+                pending_closure_frees[i], pending_closure_frees[i]);
+    }
+    pending_closure_free_count = 0;
+}
+
 // Strip template suffix from a type name (for example, "MyStruct<T>" -> "MyStruct")
 // Returns newly allocated string, caller must free.
 char *strip_template_suffix(const char *name)
