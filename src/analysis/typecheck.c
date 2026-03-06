@@ -145,7 +145,7 @@ static void check_move_for_rvalue(TypeChecker *tc, ASTNode *rvalue)
     {
         return;
     }
-    
+
     if (is_type_copy(tc->pctx, rvalue->type_info))
     {
         return;
