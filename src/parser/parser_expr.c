@@ -2909,7 +2909,11 @@ ASTNode *parse_primary(ParserContext *ctx, Lexer *l)
                         {
                             strcat(fmt, "%f");
                         }
-                        else if (inner_t->kind == TYPE_STRING)
+                        else if (inner_t->kind == TYPE_STRING ||
+                                 (inner_t->kind == TYPE_ARRAY && inner_t->inner &&
+                                  (inner_t->inner->kind == TYPE_CHAR ||
+                                   inner_t->inner->kind == TYPE_U8 ||
+                                   inner_t->inner->kind == TYPE_I8)))
                         {
                             strcat(fmt, "%s");
                         }
@@ -4663,6 +4667,13 @@ ASTNode *parse_expr_prec(ParserContext *ctx, Lexer *l, Precedence min_prec)
                         else if (inner_t->kind == TYPE_STRING)
                         {
                             strcat(fmt, "%ms");
+                        }
+                        else if (inner_t->kind == TYPE_ARRAY && inner_t->inner &&
+                                 (inner_t->inner->kind == TYPE_CHAR ||
+                                  inner_t->inner->kind == TYPE_U8 ||
+                                  inner_t->inner->kind == TYPE_I8))
+                        {
+                            strcat(fmt, "%s");
                         }
                         else if (inner_t->kind == TYPE_CHAR || inner_t->kind == TYPE_I8 ||
                                  inner_t->kind == TYPE_U8 || inner_t->kind == TYPE_BYTE)
