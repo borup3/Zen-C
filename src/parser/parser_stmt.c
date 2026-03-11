@@ -500,6 +500,7 @@ ASTNode *parse_match(ParserContext *ctx, Lexer *l)
         exit_scope(ctx);
 
         ASTNode *c = ast_create(NODE_MATCH_CASE);
+        c->token = pk;
         c->match_case.pattern = pattern;
         c->match_case.binding_names = bindings;
         c->match_case.binding_count = binding_count;
@@ -983,7 +984,7 @@ ASTNode *parse_test(ParserContext *ctx, Lexer *l)
 
 ASTNode *parse_assert(ParserContext *ctx, Lexer *l)
 {
-    lexer_next(l); // assert
+    Token tk = lexer_next(l); // assert
     if (lexer_peek(l).type == TOK_LPAREN)
     {
         lexer_next(l); // optional paren? usually yes
@@ -1015,6 +1016,7 @@ ASTNode *parse_assert(ParserContext *ctx, Lexer *l)
     }
 
     ASTNode *n = ast_create(NODE_ASSERT);
+    n->token = tk;
     n->assert_stmt.condition = cond;
     n->assert_stmt.message = msg;
     return n;
@@ -1079,6 +1081,7 @@ ASTNode *parse_return(ParserContext *ctx, Lexer *l)
         {
             char *code = parse_tuple_literal(ctx, l, curr_func_ret);
             ASTNode *raw = ast_create(NODE_RAW_STMT);
+            raw->token = return_token;
             raw->raw_stmt.content = code;
             n->ret.value = raw;
             handled = 1;
@@ -1106,7 +1109,7 @@ ASTNode *parse_return(ParserContext *ctx, Lexer *l)
 
 ASTNode *parse_if(ParserContext *ctx, Lexer *l)
 {
-    lexer_next(l); // eat if
+    Token if_token = lexer_next(l); // eat if
     ASTNode *cond = parse_expression(ctx, l);
     check_assignment_condition(cond);
 
@@ -1149,6 +1152,7 @@ ASTNode *parse_if(ParserContext *ctx, Lexer *l)
         }
     }
     ASTNode *n = ast_create(NODE_IF);
+    n->token = if_token;
     n->if_stmt.condition = cond;
     n->if_stmt.then_body = then_b;
     n->if_stmt.else_body = else_b;
@@ -1157,7 +1161,7 @@ ASTNode *parse_if(ParserContext *ctx, Lexer *l)
 
 ASTNode *parse_while(ParserContext *ctx, Lexer *l)
 {
-    lexer_next(l);
+    Token tk = lexer_next(l);
     ASTNode *cond = parse_expression(ctx, l);
     check_assignment_condition(cond);
 
@@ -1178,6 +1182,7 @@ ASTNode *parse_while(ParserContext *ctx, Lexer *l)
         body = parse_statement(ctx, l);
     }
     ASTNode *n = ast_create(NODE_WHILE);
+    n->token = tk;
     n->while_stmt.condition = cond;
     n->while_stmt.body = body;
     return n;
@@ -1185,7 +1190,7 @@ ASTNode *parse_while(ParserContext *ctx, Lexer *l)
 
 ASTNode *parse_for(ParserContext *ctx, Lexer *l)
 {
-    lexer_next(l);
+    Token for_token = lexer_next(l);
 
     if (lexer_peek(l).type == TOK_IDENT)
     {
@@ -1228,6 +1233,7 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
                     ASTNode *end_expr = parse_expression(ctx, l);
 
                     ASTNode *n = ast_create(NODE_FOR_RANGE);
+                    n->token = for_token;
                     n->for_range.var_name = xmalloc(var.len + 1);
                     strncpy(n->for_range.var_name, var.start, var.len);
                     n->for_range.var_name[var.len] = 0;
@@ -1741,6 +1747,7 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
     exit_scope(ctx);
 
     ASTNode *n = ast_create(NODE_FOR);
+    n->token = for_token;
     n->for_stmt.init = init;
     n->for_stmt.condition = cond;
     n->for_stmt.step = step;
@@ -2279,6 +2286,7 @@ ASTNode *parse_macro_call(ParserContext *ctx, Lexer *l, char *macro_name)
 
     // Create Raw Statement/Expression Node
     ASTNode *n = ast_create(NODE_RAW_STMT);
+    n->token = start_tok;
     n->line = start_tok.line;
     n->raw_stmt.content = expanded_code;
 
@@ -2320,12 +2328,13 @@ ASTNode *parse_statement(ParserContext *ctx, Lexer *l)
 
     if (tk.type == TOK_PREPROC)
     {
-        lexer_next(l); // consume token
+        Token tk = lexer_next(l); // consume token
         char *content = xmalloc(tk.len + 2);
         strncpy(content, tk.start, tk.len);
         content[tk.len] = '\n'; // Ensure newline
         content[tk.len + 1] = 0;
         ASTNode *raw_s = ast_create(NODE_RAW_STMT);
+        raw_s->token = tk;
         raw_s->raw_stmt.content = content;
         return raw_s;
     }
@@ -2543,6 +2552,7 @@ ASTNode *parse_statement(ParserContext *ctx, Lexer *l)
             content[len] = 0;
 
             ASTNode *raw_s = ast_create(NODE_RAW_STMT);
+            raw_s->token = tk;
             raw_s->raw_stmt.content = normalize_raw_content(content);
             free(content);
             return raw_s;
@@ -2949,6 +2959,7 @@ ASTNode *parse_statement(ParserContext *ctx, Lexer *l)
             }
 
             ASTNode *n = ast_create(NODE_RAW_STMT);
+            n->token = t;
             // Append semicolon to Statement Expression to make it a valid statement
             char *stmt_code = xmalloc(strlen(code) + 2);
             sprintf(stmt_code, "%s;", code);
@@ -3030,7 +3041,7 @@ ASTNode *parse_block(ParserContext *ctx, Lexer *l)
     expect(l, TOK_LBRACE, "Expected '{' to start a block");
     enter_scope(ctx);
     ASTNode *head = 0, *tail = 0;
-
+    Token t = lexer_peek(l);
     int unreachable = 0;
 
     while (1)
@@ -3148,6 +3159,7 @@ ASTNode *parse_block(ParserContext *ctx, Lexer *l)
 
     exit_scope(ctx);
     ASTNode *b = ast_create(NODE_BLOCK);
+    b->token = t;
     b->block.statements = head;
     return b;
 }
