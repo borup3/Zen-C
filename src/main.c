@@ -153,9 +153,9 @@ int main(int argc, char **argv)
         {
             g_config.quiet = 1;
         }
-        else if (strcmp(arg, "--no-zen") == 0)
+        else if (strcmp(arg, "--zen") == 0)
         {
-            g_config.no_zen = 1;
+            g_config.zen_mode = 1;
         }
         else if (strcmp(arg, "--check") == 0)
         {

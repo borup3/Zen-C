@@ -70,7 +70,7 @@ void print_usage()
     printf("  " COLOR_CYAN "--check" COLOR_RESET
            "         Enable semantic analysis (types, borrows, moves)\n");
     printf("  " COLOR_CYAN "--json" COLOR_RESET "          Emit diagnostics as JSON\n");
-    printf("  " COLOR_CYAN "--no-zen" COLOR_RESET "        Disable Zen facts\n");
+    printf("  " COLOR_CYAN "--zen" COLOR_RESET "           Enable Zen facts\n");
     printf("  " COLOR_CYAN "--cpp" COLOR_RESET "           Use C++ mode\n");
     printf("  " COLOR_CYAN "--objective-c" COLOR_RESET "   Use Objective-C mode\n");
     printf("  " COLOR_CYAN "--cuda" COLOR_RESET "          Use CUDA mode (requires nvcc)\n");

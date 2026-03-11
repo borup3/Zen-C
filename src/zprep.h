@@ -207,7 +207,7 @@ typedef struct
     int emit_c;          ///< 1 if --emit-c (keep generated C file).
     int verbose;         ///< 1 if --verbose.
     int quiet;           ///< 1 if --quiet.
-    int no_zen;          ///< 1 if --no-zen (disable zen facts/easter eggs).
+    int zen_mode;        ///< 1 if --zen (enable zen facts/easter eggs).
     int repl_mode;       ///< 1 if --repl (internal flag for REPL usage).
     int is_freestanding; ///< 1 if --freestanding (no stdlib).
     int mode_transpile;  ///< 1 if 'transpile' command (to C).

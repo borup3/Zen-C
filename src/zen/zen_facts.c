@@ -5,9 +5,6 @@
 #include <time.h>
 #include <unistd.h>
 
-// We keep it low by default.
-#define ZEN_PROBABILITY 10
-
 typedef struct
 {
     ZenTrigger trigger;
@@ -210,7 +207,7 @@ void zzen_at(Token t, const char *msg, const char *url)
 
 int zen_trigger_at(ZenTrigger t, Token location)
 {
-    if (g_config.quiet || g_config.no_zen)
+    if (g_config.quiet || !g_config.zen_mode)
     {
         return 0;
     }
@@ -222,11 +219,6 @@ int zen_trigger_at(ZenTrigger t, Token location)
 
     extern int g_warning_count;
     if (g_warning_count > 0)
-    {
-        return 0;
-    }
-
-    if ((rand() % 100) >= ZEN_PROBABILITY)
     {
         return 0;
     }
@@ -270,7 +262,7 @@ int zen_trigger_at(ZenTrigger t, Token location)
 
 void zen_trigger_global(void)
 {
-    if (g_config.quiet || g_config.no_zen)
+    if (g_config.quiet || !g_config.zen_mode)
     {
         return;
     }
@@ -285,11 +277,6 @@ void zen_trigger_global(void)
 
     extern int g_warning_count;
     if (g_warning_count > 0)
-    {
-        return;
-    }
-
-    if ((rand() % 100) >= ZEN_PROBABILITY)
     {
         return;
     }

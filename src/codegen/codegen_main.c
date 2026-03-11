@@ -55,15 +55,16 @@ static int struct_depends_on(ParserContext *ctx, ASTNode *s1, const char *target
                     }
                 }
 
+                char *mangled_clean = replace_string_type(clean);
+
                 // Check for match
                 size_t len = strlen(target_name);
-                if (strncmp(clean, target_name, len) == 0)
+                int is_match = (strncmp(mangled_clean, target_name, len) == 0);
+                free(mangled_clean);
+
+                if (is_match)
                 {
-                    char next = clean[len];
-                    if (next == 0 || next == '[' || isspace(next))
-                    {
-                        return 1;
-                    }
+                    return 1;
                 }
             }
             field = field->next;
@@ -109,9 +110,14 @@ static int struct_depends_on(ParserContext *ctx, ASTNode *s1, const char *target
                             clean = alias;
                         }
                     }
+                    char *mangled_clean = replace_string_type(clean);
 
+                    // Check for match
                     size_t len = strlen(target_name);
-                    if (strncmp(clean, target_name, len) == 0)
+                    int is_match = (strncmp(mangled_clean, target_name, len) == 0);
+                    free(mangled_clean);
+
+                    if (is_match)
                     {
                         char next = clean[len];
                         if (next == 0 || next == '[' || isspace(next))
