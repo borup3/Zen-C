@@ -1,0 +1,116 @@
+import "./bigint.zc"
+import "./string.zc"
+
+struct BigFloat {
+    magnitude: BigInt;
+    scale: int;
+}
+
+impl BigFloat {
+    fn new() -> Self {
+        return BigFloat {
+            magnitude: BigInt::from_int(0),
+            scale: 0
+        };
+    }
+
+    fn from_int(val: u64) -> Self {
+        return BigFloat {
+            magnitude: BigInt::from_int(val),
+            scale: 0
+        };
+    }
+
+    fn from_bigint(val: BigInt, scale: int) -> Self {
+        return BigFloat {
+            magnitude: val,
+            scale: scale
+        };
+    }
+
+    fn clone(self) -> Self {
+        return BigFloat {
+            magnitude: self.magnitude.clone(),
+            scale: self.scale
+        };
+    }
+
+    fn free_mem(self) {
+        self.magnitude.free_mem();
+    }
+
+    fn align_scale(self, target_scale: int) {
+        while self.scale < target_scale {
+            self.magnitude.digits.insert(0, 0);
+            self.scale = self.scale + 1;
+        }
+    }
+
+    fn add(self, other: BigFloat) -> BigFloat {
+        let s = self.clone();
+        let o = other.clone();
+
+        if s.scale < o.scale {
+            s.align_scale(o.scale);
+        } else if o.scale < s.scale {
+            o.align_scale(s.scale);
+        }
+
+        s.magnitude.add_in_place(o.magnitude);
+        let res = BigFloat::from_bigint(s.magnitude.clone(), s.scale);
+        
+        return res;
+    }
+
+    fn to_string(self) -> char* {
+        let s_digits = self.magnitude.to_string();
+        let len = strlen(s_digits);
+        
+        if self.scale <= 0 {
+            return s_digits;
+        }
+
+        let res_len = len + 2; // +1 for '.', +1 for possible leading '0'
+        if (int)len <= self.scale {
+            res_len += self.scale - (int)len + 1;
+        }
+        
+        let buf: char* = malloc(res_len + 1);
+        let b_idx: int = 0;
+        let d_idx: int = 0;
+
+        if (int)len <= self.scale {
+            buf[b_idx] = '0'; b_idx += 1;
+            buf[b_idx] = '.'; b_idx += 1;
+            let i: int = 0;
+            while i < self.scale - (int)len {
+                buf[b_idx] = '0'; b_idx += 1;
+                i += 1;
+            }
+            while d_idx < (int)len {
+                buf[b_idx] = s_digits[d_idx]; b_idx += 1;
+                d_idx += 1;
+            }
+        } else {
+            let dot_pos = (int)len - self.scale;
+            while d_idx < dot_pos {
+                buf[b_idx] = s_digits[d_idx]; b_idx += 1;
+                d_idx += 1;
+            }
+            buf[b_idx] = '.'; b_idx += 1;
+            while d_idx < (int)len {
+                buf[b_idx] = s_digits[d_idx]; b_idx += 1;
+                d_idx += 1;
+            }
+        }
+        buf[b_idx] = 0;
+        free(s_digits);
+        return buf;
+    }
+}
+
+impl Drop for BigFloat {
+    fn drop(self) {
+        self.free_mem();
+    }
+}

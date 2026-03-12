@@ -1433,6 +1433,7 @@ Zen C includes a standard library (`std`) covering essential functionality.
 
 | Module | Description | Docs |
 | :--- | :--- | :--- |
+| **`std/bigfloat.zc`** | Arbitrary-precision floating-point arithmetic. | [Docs](docs/std/bigfloat.md) |
 | **`std/bigint.zc`** | Arbitrary-precision integer `BigInt`. | [Docs](docs/std/bigint.md) |
 | **`std/bits.zc`** | Low-level bitwise operations (`rotl`, `rotr`). | [Docs](docs/std/bits.md) |
 | **`std/complex.zc`** | Complex Number Arithmetic `Complex`. | [Docs](docs/std/complex.md) |

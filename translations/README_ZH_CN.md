@@ -1385,6 +1385,7 @@ Zen C 包含一个涵盖基本功能的标准库 (`std`)。
 
 | 模块 | 描述 | 文档 |
 | :--- | :--- | :--- |
+| **`std/bigfloat.zc`** | 任意精度浮点运算。 | [文档](../docs/std/bigfloat.md) |
 | **`std/bigint.zc`** | 任意精度整数 `BigInt`。 | [文档](../docs/std/bigint.md) |
 | **`std/bits.zc`** | 底层位运算操作 (`rotl`, `rotr` 等)。 | [文档](../docs/std/bits.md) |
 | **`std/complex.zc`** | 复数算术 `Complex`。 | [文档](../docs/std/complex.md) |

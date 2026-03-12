@@ -1421,6 +1421,7 @@ Zen C include una libreria standard (`std`) che ricopre funzionalità essenziali
 
 | Modulo | Descrizione | Documentazione |
 | :--- | :--- | :--- |
+| **`std/bigfloat.zc`** | Aritmetica in virgola mobile a precisione arbitraria. | [Docs](../docs/std/bigfloat.md) |
 | **`std/bigint.zc`** | Intero a precisione arbitraria `BigInt`. | [Docs](../docs/std/bigint.md) |
 | **`std/bits.zc`** | Operazioni bit a bit a basso livello (`rotl`, `rotr`, ecc.). | [Docs](../docs/std/bits.md) |
 | **`std/complex.zc`** | Aritmetica dei numeri complessi `Complex`. | [Docs](../docs/std/complex.md) |
