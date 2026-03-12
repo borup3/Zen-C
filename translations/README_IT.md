@@ -570,6 +570,10 @@ for i in 10..0 step -1 { ... }  // Descending loop
 // Iteratore (Vec, Array, oppure un Iteratore personalizzato)
 for item in collection { ... }
 
+// Enumerato: ottieni indice e valore
+for i, val in collection { ... }   // i = 0, 1, 2, ...
+for i, val in 0..10 step 2 { ... } // i = 0, 1, 2, ...; val = 0, 2, 4, ...
+
 // While (lett. mentre)
 while x < 10 { ... }
 

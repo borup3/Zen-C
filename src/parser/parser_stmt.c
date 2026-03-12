@@ -1187,32 +1187,43 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
 {
     lexer_next(l);
 
-    // Range Loop: for i in 0..10
     if (lexer_peek(l).type == TOK_IDENT)
     {
         int saved_pos = l->pos;
         Token var = lexer_next(l);
+
+        char *enum_idx_name = NULL;
+        Token val_tok = {0};
+        if (lexer_peek(l).type == TOK_COMMA)
+        {
+            lexer_next(l);
+            val_tok = lexer_next(l);
+            enum_idx_name = xmalloc(var.len + 1);
+            strncpy(enum_idx_name, var.start, var.len);
+            enum_idx_name[var.len] = 0;
+            var = val_tok;
+        }
+
         Token in_tok = lexer_next(l);
 
         if (in_tok.type == TOK_IDENT && strncmp(in_tok.start, "in", 2) == 0)
         {
             ASTNode *start_expr = parse_expression(ctx, l);
-            // Check for Range Loop (.. or ..= or ..<)
             ZenTokenType next_tok = lexer_peek(l).type;
             if (next_tok == TOK_DOTDOT || next_tok == TOK_DOTDOT_LT || next_tok == TOK_DOTDOT_EQ)
             {
                 int is_inclusive = 0;
                 if (next_tok == TOK_DOTDOT || next_tok == TOK_DOTDOT_LT)
                 {
-                    lexer_next(l); // consume .. or ..<
+                    lexer_next(l);
                 }
                 else if (next_tok == TOK_DOTDOT_EQ)
                 {
                     is_inclusive = 1;
-                    lexer_next(l); // consume ..=
+                    lexer_next(l);
                 }
 
-                if (1) // Block to keep scope for variables
+                if (1)
                 {
                     ASTNode *end_expr = parse_expression(ctx, l);
 
@@ -1254,45 +1265,99 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
 
                     enter_scope(ctx);
                     add_symbol(ctx, n->for_range.var_name, "int", type_new(TYPE_INT));
+                    if (enum_idx_name)
+                    {
+                        add_symbol(ctx, enum_idx_name, "int", type_new(TYPE_INT));
+                    }
 
+                    ASTNode *user_body = NULL;
                     if (lexer_peek(l).type == TOK_LBRACE)
                     {
-                        n->for_range.body = parse_block(ctx, l);
+                        user_body = parse_block(ctx, l);
                     }
                     else
                     {
-                        n->for_range.body = parse_statement(ctx, l);
+                        user_body = parse_statement(ctx, l);
                     }
                     exit_scope(ctx);
 
-                    return n;
+                    if (enum_idx_name)
+                    {
+                        ASTNode *idx_decl = ast_create(NODE_VAR_DECL);
+                        idx_decl->var_decl.name = xstrdup("__zc_enum_idx");
+                        idx_decl->var_decl.type_str = xstrdup("int");
+                        idx_decl->var_decl.type_info = type_new(TYPE_INT);
+                        ASTNode *zero_lit = ast_create(NODE_EXPR_LITERAL);
+                        zero_lit->literal.type_kind = LITERAL_INT;
+                        zero_lit->literal.int_val = 0;
+                        zero_lit->literal.string_val = xstrdup("0");
+                        idx_decl->var_decl.init_expr = zero_lit;
+
+                        ASTNode *idx_bind = ast_create(NODE_VAR_DECL);
+                        idx_bind->var_decl.name = enum_idx_name;
+                        idx_bind->var_decl.type_str = xstrdup("int");
+                        idx_bind->var_decl.type_info = type_new(TYPE_INT);
+                        ASTNode *idx_ref = ast_create(NODE_EXPR_VAR);
+                        idx_ref->var_ref.name = xstrdup("__zc_enum_idx");
+                        idx_bind->var_decl.init_expr = idx_ref;
+
+                        ASTNode *idx_inc = ast_create(NODE_EXPR_UNARY);
+                        idx_inc->unary.op = xstrdup("++");
+                        ASTNode *idx_ref2 = ast_create(NODE_EXPR_VAR);
+                        idx_ref2->var_ref.name = xstrdup("__zc_enum_idx");
+                        idx_inc->unary.operand = idx_ref2;
+
+                        ASTNode *new_body = ast_create(NODE_BLOCK);
+                        idx_bind->next = user_body;
+                        if (user_body && user_body->type == NODE_BLOCK)
+                        {
+                            ASTNode *last = user_body->block.statements;
+                            if (last)
+                            {
+                                while (last->next)
+                                {
+                                    last = last->next;
+                                }
+                                last->next = idx_inc;
+                            }
+                            idx_bind->next = user_body->block.statements;
+                            user_body->block.statements = idx_bind;
+                            new_body = user_body;
+                        }
+                        else
+                        {
+                            if (user_body)
+                            {
+                                user_body->next = idx_inc;
+                            }
+                            idx_bind->next = user_body;
+                            new_body->block.statements = idx_bind;
+                        }
+
+                        n->for_range.body = new_body;
+
+                        ASTNode *outer = ast_create(NODE_BLOCK);
+                        idx_decl->next = n;
+                        outer->block.statements = idx_decl;
+                        return outer;
+                    }
+                    else
+                    {
+                        n->for_range.body = user_body;
+                        return n;
+                    }
                 }
             }
             else
             {
-                // Iterator Loop: for x in obj
-                // Desugar to:
-                /*
-                   {
-                       var __it = obj.iterator();
-                       while (true) {
-                           var __opt = __it.next();
-                           if (__opt.is_none()) break;
-                           var x = __opt.unwrap();
-                           <body...>
-                       }
-                   }
-                */
-
                 char *var_name = xmalloc(var.len + 1);
                 strncpy(var_name, var.start, var.len);
                 var_name[var.len] = 0;
 
                 ASTNode *obj_expr = start_expr;
                 char *iter_method = "iterator";
-                ASTNode *slice_decl = NULL; // Track if we need to add a slice declaration
+                ASTNode *slice_decl = NULL;
 
-                // Check for reference iteration: for x in &vec
                 if (obj_expr->type == NODE_EXPR_UNARY && obj_expr->unary.op &&
                     strcmp(obj_expr->unary.op, "&") == 0)
                 {
@@ -1300,15 +1365,12 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
                     iter_method = "iter_ref";
                 }
 
-                // Check for array iteration: wrap with Slice<T>::from_array
                 if (obj_expr->type_info && obj_expr->type_info->kind == TYPE_ARRAY &&
                     obj_expr->type_info->array_size > 0)
                 {
-                    // Create a var decl for the slice
                     slice_decl = ast_create(NODE_VAR_DECL);
                     slice_decl->var_decl.name = xstrdup("__zc_arr_slice");
 
-                    // Build type string: Slice<elem_type>
                     char *elem_type_str = type_to_string(obj_expr->type_info->inner);
                     char slice_type[256];
                     sprintf(slice_type, "Slice<%s>", elem_type_str);
@@ -1317,14 +1379,12 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
                     ASTNode *from_array_call = ast_create(NODE_EXPR_CALL);
                     ASTNode *static_method = ast_create(NODE_EXPR_VAR);
 
-                    // The function name for static methods is Type::method format
                     char func_name[512];
                     snprintf(func_name, 511, "%s::from_array", slice_type);
                     static_method->var_ref.name = xstrdup(func_name);
 
                     from_array_call->call.callee = static_method;
 
-                    // Create arguments
                     ASTNode *arr_addr = ast_create(NODE_EXPR_UNARY);
                     arr_addr->unary.op = xstrdup("&");
                     arr_addr->unary.operand = obj_expr;
@@ -1348,14 +1408,10 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
 
                     slice_decl->var_decl.init_expr = from_array_call;
 
-                    // Manually trigger generic instantiation for Slice<T>
-                    // This ensures that Slice_int, Slice_float, etc. structures are generated
-                    // First, ensure std/slice.zc is imported (auto-import if needed)
                     auto_import_std_slice(ctx);
                     Token dummy_tok = {0};
                     instantiate_generic(ctx, "Slice", elem_type_str, elem_type_str, dummy_tok);
 
-                    // Instantiate SliceIter and Option too for the loop logic
                     char iter_type[256];
                     sprintf(iter_type, "SliceIter<%s>", elem_type_str);
                     instantiate_generic(ctx, "SliceIter", elem_type_str, elem_type_str, dummy_tok);
@@ -1364,22 +1420,18 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
                     sprintf(option_type, "Option<%s>", elem_type_str);
                     instantiate_generic(ctx, "Option", elem_type_str, elem_type_str, dummy_tok);
 
-                    // Replace obj_expr with a reference to the slice variable
                     ASTNode *slice_ref = ast_create(NODE_EXPR_VAR);
                     slice_ref->var_ref.name = xstrdup("__zc_arr_slice");
-                    slice_ref->resolved_type =
-                        xstrdup(slice_type); // Explicitly set type for codegen
+                    slice_ref->resolved_type = xstrdup(slice_type);
                     obj_expr = slice_ref;
 
                     free(elem_type_str);
                 }
 
-                // var __it = obj.iterator();
                 ASTNode *it_decl = ast_create(NODE_VAR_DECL);
                 it_decl->var_decl.name = xstrdup("__it");
-                it_decl->var_decl.type_str = NULL; // inferred
+                it_decl->var_decl.type_str = NULL;
 
-                // obj.iterator() or obj.iter_ref()
                 ASTNode *call_iter = ast_create(NODE_EXPR_CALL);
                 ASTNode *memb_iter = ast_create(NODE_EXPR_MEMBER);
                 memb_iter->member.target = obj_expr;
@@ -1390,10 +1442,9 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
 
                 it_decl->var_decl.init_expr = call_iter;
 
-                // while(true)
                 ASTNode *while_loop = ast_create(NODE_WHILE);
                 ASTNode *true_lit = ast_create(NODE_EXPR_LITERAL);
-                true_lit->literal.type_kind = LITERAL_INT; // Treated as bool in conditions
+                true_lit->literal.type_kind = LITERAL_INT;
                 true_lit->literal.int_val = 1;
                 true_lit->literal.string_val = xstrdup("1");
                 while_loop->while_stmt.condition = true_lit;
@@ -1507,11 +1558,29 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
                 call_unwrap->call.arg_count = 0;
 
                 user_var_decl->var_decl.init_expr = call_unwrap;
+
+                // If enumerated, bind idx before user_var
+                if (enum_idx_name)
+                {
+                    ASTNode *idx_bind = ast_create(NODE_VAR_DECL);
+                    idx_bind->var_decl.name = enum_idx_name;
+                    idx_bind->var_decl.type_str = xstrdup("int");
+                    idx_bind->var_decl.type_info = type_new(TYPE_INT);
+                    ASTNode *idx_ref = ast_create(NODE_EXPR_VAR);
+                    idx_ref->var_ref.name = xstrdup("__zc_enum_idx");
+                    idx_bind->var_decl.init_expr = idx_ref;
+                    APPEND_STMT(idx_bind);
+                }
+
                 APPEND_STMT(user_var_decl);
 
                 // User body statements
                 enter_scope(ctx);
                 add_symbol(ctx, var_name, NULL, NULL);
+                if (enum_idx_name)
+                {
+                    add_symbol(ctx, enum_idx_name, "int", type_new(TYPE_INT));
+                }
 
                 // Body block
                 ASTNode *stmt = parse_statement(ctx, l);
@@ -1527,23 +1596,67 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
                 // Append user body statements to our loop body
                 APPEND_STMT(user_body_node);
 
+                // If enumerated, append __zc_enum_idx++
+                if (enum_idx_name)
+                {
+                    ASTNode *idx_inc = ast_create(NODE_EXPR_UNARY);
+                    idx_inc->unary.op = xstrdup("++");
+                    ASTNode *idx_ref3 = ast_create(NODE_EXPR_VAR);
+                    idx_ref3->var_ref.name = xstrdup("__zc_enum_idx");
+                    idx_inc->unary.operand = idx_ref3;
+                    APPEND_STMT(idx_inc);
+                }
+
                 loop_body->block.statements = stmts_head;
                 while_loop->while_stmt.body = loop_body;
 
                 // Wrap entire thing in a block to scope __it (and __zc_arr_slice if present)
                 ASTNode *outer_block = ast_create(NODE_BLOCK);
+
+                // If enumerated, add __zc_enum_idx decl to the chain
+                ASTNode *enum_idx_decl_node = NULL;
+                if (enum_idx_name)
+                {
+                    enum_idx_decl_node = ast_create(NODE_VAR_DECL);
+                    enum_idx_decl_node->var_decl.name = xstrdup("__zc_enum_idx");
+                    enum_idx_decl_node->var_decl.type_str = xstrdup("int");
+                    enum_idx_decl_node->var_decl.type_info = type_new(TYPE_INT);
+                    ASTNode *zero_lit = ast_create(NODE_EXPR_LITERAL);
+                    zero_lit->literal.type_kind = LITERAL_INT;
+                    zero_lit->literal.int_val = 0;
+                    zero_lit->literal.string_val = xstrdup("0");
+                    enum_idx_decl_node->var_decl.init_expr = zero_lit;
+                }
+
                 if (slice_decl)
                 {
-                    // Chain: slice_decl -> it_decl -> while_loop
-                    slice_decl->next = it_decl;
-                    it_decl->next = while_loop;
-                    outer_block->block.statements = slice_decl;
+                    if (enum_idx_decl_node)
+                    {
+                        enum_idx_decl_node->next = slice_decl;
+                        slice_decl->next = it_decl;
+                        it_decl->next = while_loop;
+                        outer_block->block.statements = enum_idx_decl_node;
+                    }
+                    else
+                    {
+                        slice_decl->next = it_decl;
+                        it_decl->next = while_loop;
+                        outer_block->block.statements = slice_decl;
+                    }
                 }
                 else
                 {
-                    // Chain: it_decl -> while_loop
-                    it_decl->next = while_loop;
-                    outer_block->block.statements = it_decl;
+                    if (enum_idx_decl_node)
+                    {
+                        enum_idx_decl_node->next = it_decl;
+                        it_decl->next = while_loop;
+                        outer_block->block.statements = enum_idx_decl_node;
+                    }
+                    else
+                    {
+                        it_decl->next = while_loop;
+                        outer_block->block.statements = it_decl;
+                    }
                 }
 
                 return outer_block;

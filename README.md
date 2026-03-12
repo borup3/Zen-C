@@ -568,6 +568,10 @@ for i in 10..0 step -1 { ... }  // Descending loop
 // Iterator (Vec or custom Iterable)
 for item in vec { ... }
 
+// Enumerated: get index and value
+for i, val in arr { ... }       // i = 0, 1, 2, ...
+for i, val in 0..10 step 2 { ... } // i = 0, 1, 2, ...; val = 0, 2, 4, ...
+
 // Iterate over fixed-size arrays directly
 let arr: int[5] = [1, 2, 3, 4, 5];
 for val in arr {

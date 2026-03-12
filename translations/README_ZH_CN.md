@@ -570,6 +570,10 @@ for i in 10..0 step -1 { ... }  // Descending loop
 // 迭代器 (Vec 或自定義 Iterable)
 for item in vec { ... }
 
+// 枚举：获取索引和值
+for i, val in arr { ... }       // i = 0, 1, 2, ...
+for i, val in 0..10 step 2 { ... } // i = 0, 1, 2, ...; val = 0, 2, 4, ...
+
 // 直接迭代固定大小数组
 let arr: int[5] = [1, 2, 3, 4, 5];
 for val in arr {
