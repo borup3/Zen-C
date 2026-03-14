@@ -497,11 +497,13 @@ void codegen_match_internal(ParserContext *ctx, ASTNode *node, FILE *out, int us
                     ASTNode *stmt = body->block.statements;
                     while (stmt)
                     {
+                        emit_source_mapping(stmt, out);
                         codegen_node_single(ctx, stmt, out);
                         stmt = stmt->next;
                     }
                     for (int i = defer_count - 1; i >= saved; i--)
                     {
+                        emit_source_mapping_duplicate(defer_stack[i], out);
                         codegen_node_single(ctx, defer_stack[i], out);
                     }
                     defer_count = saved;
@@ -661,6 +663,7 @@ void codegen_node_single(ParserContext *ctx, ASTNode *node, FILE *out)
             codegen_walker(ctx, node->func.body, out);
             for (int i = defer_count - 1; i >= 0; i--)
             {
+                emit_source_mapping_duplicate(defer_stack[i], out);
                 codegen_node_single(ctx, defer_stack[i], out);
             }
             fprintf(out, "}\n");
@@ -865,6 +868,7 @@ void codegen_node_single(ParserContext *ctx, ASTNode *node, FILE *out)
         codegen_walker(ctx, node->func.body, out);
         for (int i = defer_count - 1; i >= 0; i--)
         {
+            emit_source_mapping_duplicate(defer_stack[i], out);
             codegen_node_single(ctx, defer_stack[i], out);
         }
         g_current_func_ret_type = prev_ret;
@@ -1070,6 +1074,7 @@ void codegen_node_single(ParserContext *ctx, ASTNode *node, FILE *out)
         codegen_walker(ctx, node->block.statements, out);
         for (int i = defer_count - 1; i >= saved; i--)
         {
+            emit_source_mapping_duplicate(defer_stack[i], out);
             codegen_node_single(ctx, defer_stack[i], out);
         }
         defer_count = saved;
@@ -1419,6 +1424,7 @@ void codegen_node_single(ParserContext *ctx, ASTNode *node, FILE *out)
             int boundary = loop_defer_boundary[loop_depth - 1];
             for (int i = defer_count - 1; i >= boundary; i--)
             {
+                emit_source_mapping_duplicate(defer_stack[i], out);
                 codegen_node_single(ctx, defer_stack[i], out);
             }
         }
@@ -1438,6 +1444,7 @@ void codegen_node_single(ParserContext *ctx, ASTNode *node, FILE *out)
             int boundary = loop_defer_boundary[loop_depth - 1];
             for (int i = defer_count - 1; i >= boundary; i--)
             {
+                emit_source_mapping_duplicate(defer_stack[i], out);
                 codegen_node_single(ctx, defer_stack[i], out);
             }
         }
@@ -1823,6 +1830,7 @@ void codegen_node_single(ParserContext *ctx, ASTNode *node, FILE *out)
                     fprintf(out, "__z_drop_flag_%s = 0; ", node->ret.value->var_ref.name);
                     for (int i = defer_count - 1; i >= func_defer_boundary; i--)
                     {
+                        emit_source_mapping_duplicate(defer_stack[i], out);
                         codegen_node_single(ctx, defer_stack[i], out);
                     }
                     fprintf(out, "_z_ret_mv; });\n");
@@ -1843,6 +1851,7 @@ void codegen_node_single(ParserContext *ctx, ASTNode *node, FILE *out)
                 fprintf(out, "; ");
                 for (int i = defer_count - 1; i >= func_defer_boundary; i--)
                 {
+                    emit_source_mapping_duplicate(defer_stack[i], out);
                     codegen_node_single(ctx, defer_stack[i], out);
                 }
                 fprintf(out, "return _z_ret; }\n");
@@ -1851,6 +1860,7 @@ void codegen_node_single(ParserContext *ctx, ASTNode *node, FILE *out)
             {
                 for (int i = defer_count - 1; i >= func_defer_boundary; i--)
                 {
+                    emit_source_mapping_duplicate(defer_stack[i], out);
                     codegen_node_single(ctx, defer_stack[i], out);
                 }
                 fprintf(out, "    return;\n");
@@ -2116,7 +2126,6 @@ void codegen_node_single(ParserContext *ctx, ASTNode *node, FILE *out)
         }
         else
         {
-            emit_source_mapping_duplicate(node, out);
             fprintf(out, "    %s\n", node->raw_stmt.content);
         }
         break;

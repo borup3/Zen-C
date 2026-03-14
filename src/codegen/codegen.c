@@ -1393,6 +1393,7 @@ void codegen_expression(ParserContext *ctx, ASTNode *node, FILE *out)
         codegen_walker(ctx, node->block.statements, out);
         for (int i = defer_count - 1; i >= saved; i--)
         {
+            emit_source_mapping_duplicate(defer_stack[i], out);
             codegen_node_single(ctx, defer_stack[i], out);
         }
         defer_count = saved;
