@@ -1147,6 +1147,7 @@ char *escape_c_string(const char *input)
 static ASTNode *create_fstring_block(ParserContext *ctx, Token parent_token, char *content, int len)
 {
     ASTNode *block = ast_create(NODE_BLOCK);
+    block->token = parent_token;
     block->type_info = type_new(TYPE_STRING);
     block->resolved_type = xstrdup("string");
 
@@ -1444,6 +1445,7 @@ static ASTNode *create_fstring_block(ParserContext *ctx, Token parent_token, cha
         ASTNode *call_sprintf = ast_create(NODE_EXPR_CALL);
         call_sprintf->token = peek;
         ASTNode *callee = ast_create(NODE_EXPR_VAR);
+        callee->token = peek;
         callee->var_ref.name = xstrdup("sprintf");
         call_sprintf->call.callee = callee;
 
@@ -1488,7 +1490,7 @@ static ASTNode *create_fstring_block(ParserContext *ctx, Token parent_token, cha
 
         // strcat(_b, _t)
         ASTNode *cat_t = ast_create(NODE_RAW_STMT);
-        cat_t->token = parent_token;
+        cat_t->token = peek;
         cat_t->raw_stmt.content = xstrdup("strcat(_b, _t);");
         tail->next = cat_t;
         tail = cat_t;
@@ -2142,7 +2144,6 @@ ASTNode *parse_primary(ParserContext *ctx, Lexer *l)
             }
 
             char pat_buf[1024] = {0};
-            Token peek;
             while (1)
             {
                 peek = lexer_peek(l);
@@ -2156,7 +2157,7 @@ ASTNode *parse_primary(ParserContext *ctx, Lexer *l)
                     break;
                 }
 
-                Token t = lexer_next(l);
+                t = lexer_next(l);
                 char *s = token_strdup(t);
                 if (t.type == TOK_COMMA)
                 {
@@ -3799,6 +3800,7 @@ ASTNode *parse_primary(ParserContext *ctx, Lexer *l)
             node = ast_create(NODE_EXPR_CALL);
             node->token = t;
             ASTNode *callee = ast_create(NODE_EXPR_VAR);
+            callee->token = t;
             callee->var_ref.name = acc;
             node->call.callee = callee;
             node->call.args = head;
@@ -5059,7 +5061,7 @@ ASTNode *parse_expr_prec(ParserContext *ctx, Lexer *l, Precedence min_prec)
             }
 
             // Reuse printf sugar to generate the prompt print
-            char *print_code = process_printf_sugar(ctx, inner, 0, "stdout", NULL, NULL, 1);
+            char *print_code = process_printf_sugar(ctx, t_str, inner, 0, "stdout", NULL, NULL, 1);
             free(inner);
 
             // Checks for (args...) suffix for SCAN mode
@@ -5333,7 +5335,7 @@ ASTNode *parse_expr_prec(ParserContext *ctx, Lexer *l, Precedence min_prec)
                 newline = 0;
             }
 
-            char *code = process_printf_sugar(ctx, inner, newline, "stderr", NULL, NULL, 1);
+            char *code = process_printf_sugar(ctx, lexer_peek(l), inner, newline, "stderr", NULL, NULL, 1);
             free(inner);
 
             ASTNode *n = ast_create(NODE_RAW_STMT);
@@ -6525,6 +6527,7 @@ ASTNode *parse_expr_prec(ParserContext *ctx, Lexer *l, Precedence min_prec)
                             callee->var_ref.name = xstrdup(resolved_name);
                         }
 
+                        callee->token = t;
                         call->call.callee = callee;
 
                         ASTNode *self_arg = lhs;

@@ -532,9 +532,10 @@ ASTNode *parse_match(ParserContext *ctx, Lexer *l)
 
 ASTNode *parse_loop(ParserContext *ctx, Lexer *l)
 {
-    lexer_next(l);
+    Token tk = lexer_next(l);
     ASTNode *b = parse_block(ctx, l);
     ASTNode *n = ast_create(NODE_LOOP);
+    n->token = tk;
     n->loop_stmt.body = b;
     return n;
 }
@@ -564,7 +565,7 @@ ASTNode *parse_unless(ParserContext *ctx, Lexer *l)
 
 ASTNode *parse_guard(ParserContext *ctx, Lexer *l)
 {
-    lexer_next(l); // consume 'guard'
+    Token tk = lexer_next(l); // consume 'guard'
 
     // Parse the condition as an AST
     ASTNode *cond = parse_expression(ctx, l);
@@ -591,6 +592,7 @@ ASTNode *parse_guard(ParserContext *ctx, Lexer *l)
 
     // Create the node
     ASTNode *n = ast_create(NODE_GUARD);
+    n->token = tk;
     n->guard_stmt.condition = cond;
     n->guard_stmt.body = body;
     return n;
@@ -1448,6 +1450,7 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
                 ASTNode *memb_iter = ast_create(NODE_EXPR_MEMBER);
                 memb_iter->member.target = obj_expr;
                 memb_iter->member.field = xstrdup(iter_method);
+                memb_iter->token = tk;
                 call_iter->token = tk;
                 call_iter->call.callee = memb_iter;
                 call_iter->call.args = NULL;
@@ -1460,10 +1463,12 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
                 true_lit->literal.type_kind = LITERAL_INT;
                 true_lit->literal.int_val = 1;
                 true_lit->literal.string_val = xstrdup("1");
+                true_lit->token = tk;
                 while_loop->token = tk;
                 while_loop->while_stmt.condition = true_lit;
 
                 ASTNode *loop_body = ast_create(NODE_BLOCK);
+                loop_body->token = tk;
                 ASTNode *stmts_head = NULL;
                 ASTNode *stmts_tail = NULL;
 
@@ -1524,6 +1529,7 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
                 }
                 memb_next->member.target = it_ref;
                 memb_next->member.field = xstrdup("next");
+                memb_next->token = tk;
                 call_next->token = tk;
                 call_next->call.callee = memb_next;
 
@@ -1541,6 +1547,7 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
                 }
                 memb_is_none->member.target = opt_ref1;
                 memb_is_none->member.field = xstrdup("is_none");
+                memb_is_none->token = tk;
                 call_is_none->token = tk;
                 call_is_none->call.callee = memb_is_none;
                 call_is_none->call.args = NULL;
@@ -1553,6 +1560,7 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
 
                 ASTNode *break_blk = ast_create(NODE_BLOCK);
                 break_blk->block.statements = ast_create(NODE_BREAK);
+                break_blk->block.statements->token = tk;
 
                 if_break->if_stmt.then_body = break_blk;
                 if_break->if_stmt.else_body = NULL;
@@ -1575,6 +1583,7 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
                 }
                 memb_unwrap->member.target = opt_ref2;
                 memb_unwrap->member.field = xstrdup("unwrap");
+                memb_unwrap->token = tk;
                 call_unwrap->token = tk;
                 call_unwrap->call.callee = memb_unwrap;
                 call_unwrap->call.args = NULL;
@@ -1771,7 +1780,7 @@ ASTNode *parse_for(ParserContext *ctx, Lexer *l)
     return n;
 }
 
-char *process_printf_sugar(ParserContext *ctx, const char *content, int newline, const char *target,
+char *process_printf_sugar(ParserContext *ctx, Token srctoken, const char *content, int newline, const char *target,
                            char ***used_syms, int *count, int check_symbols)
 {
     int saved_silent = ctx->silent_warnings;
@@ -1890,6 +1899,9 @@ char *process_printf_sugar(ParserContext *ctx, const char *content, int newline,
         {
             Lexer lex;
             lexer_init(&lex, clean_expr); // Scan original for symbols
+            lex.line = srctoken.line;
+            lex.col = srctoken.col;
+
             Token t;
             while ((t = lexer_next(&lex)).type != TOK_EOF)
             {
@@ -1922,6 +1934,8 @@ char *process_printf_sugar(ParserContext *ctx, const char *content, int newline,
         // Parse expression fully
         Lexer lex;
         lexer_init(&lex, clean_expr);
+        lex.line = srctoken.line;
+        lex.col = srctoken.col;
 
         ASTNode *expr_node = parse_expression(ctx, &lex);
 
@@ -2359,7 +2373,8 @@ ASTNode *parse_statement(ParserContext *ctx, Lexer *l)
     {
         Lexer lookahead = *l;
         lexer_next(&lookahead);
-        ZenTokenType next_type = lexer_peek(&lookahead).type;
+        Token next = lexer_peek(&lookahead);
+        ZenTokenType next_type = next.type;
 
         if (next_type == TOK_SEMICOLON || next_type == TOK_DOTDOT || next_type == TOK_RBRACE)
         {
@@ -2390,7 +2405,7 @@ ASTNode *parse_statement(ParserContext *ctx, Lexer *l)
             char **used_syms = NULL;
             int used_count = 0;
             char *code =
-                process_printf_sugar(ctx, inner, is_ln, "stdout", &used_syms, &used_count, 1);
+                process_printf_sugar(ctx, next, inner, is_ln, "stdout", &used_syms, &used_count, 1);
 
             if (next_type == TOK_SEMICOLON)
             {
@@ -2966,7 +2981,7 @@ ASTNode *parse_statement(ParserContext *ctx, Lexer *l)
             char **used_syms = NULL;
             int used_count = 0;
             char *code =
-                process_printf_sugar(ctx, inner, is_ln, target, &used_syms, &used_count, 1);
+                process_printf_sugar(ctx, t, inner, is_ln, target, &used_syms, &used_count, 1);
             free(inner);
 
             if (lexer_peek(l).type == TOK_SEMICOLON)
