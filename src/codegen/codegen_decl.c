@@ -583,6 +583,7 @@ void emit_lambda_defs(ParserContext *ctx, FILE *out)
 
         for (int i = defer_count - 1; i >= 0; i--)
         {
+            emit_source_mapping_duplicate(defer_stack[i], out);
             codegen_node_single(ctx, defer_stack[i], out);
         }
 
@@ -1436,6 +1437,7 @@ int emit_tests_and_runner(ParserContext *ctx, ASTNode *node, FILE *out)
             // Run defers
             for (int i = defer_count - 1; i >= saved; i--)
             {
+                emit_source_mapping_duplicate(defer_stack[i], out);
                 codegen_node_single(ctx, defer_stack[i], out);
             }
             defer_count = saved;
